@@ -1,0 +1,452 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  MediFlow - API Serverless de Triagem Clínica
+  Orquestrada via Step Functions Express Workflows
+
+Globals:
+  Api:
+    Cors:
+      AllowMethods: "'OPTIONS,POST,GET'"
+      AllowHeaders: "'Content-Type,Origin,Authorization'"
+      AllowOrigin: "'*'"
+  Function:
+    Timeout: 20 # Aumentado para evitar timeout em frios
+    Runtime: python3.12
+    MemorySize: 256
+    Architectures:
+      - x86_64
+
+Resources:
+  # ============================================================
+  # KMS (Customer Managed Key para LGPD)
+  # ============================================================
+  MediFlowKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Chave CMK para criptografia em repouso do MediFlow (DynamoDB, SNS, S3)
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: kms:*
+            Resource: '*'
+          - Sid: Allow Services
+            Effect: Allow
+            Principal:
+              Service:
+                - dynamodb.amazonaws.com
+                - sns.amazonaws.com
+                - s3.amazonaws.com
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey*
+              - kms:Encrypt
+            Resource: '*'
+
+  MediFlowKMSAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/mediflow-key-${AWS::StackName}" # Único por stack
+      TargetKeyId: !Ref MediFlowKMSKey
+
+  # ============================================================
+  # DynamoDB
+  # ============================================================
+  TriageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: triageId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: eventTimestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: triageId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: eventTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref MediFlowKMSKey
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  PatientsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: patientId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: patientId
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref MediFlowKMSKey
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cpf
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cpf
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref MediFlowKMSKey
+
+  # SNS
+  # ============================================================
+  # SNS
+  # ============================================================
+  TriageEventsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      KmsMasterKeyId: !Ref MediFlowKMSKey
+
+  # ============================================================
+  # S3
+  # ============================================================
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !Ref MediFlowKMSKey
+
+  # ============================================================
+  # Lambda Functions — API de Gestão (Cadastro e Fila)
+  # ============================================================
+  RegisterUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Register"
+      Handler: app.lambda_handler
+      CodeUri: src/auth/register/
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+      Events:
+        RegisterApiEvent:
+          Type: Api
+          Properties:
+            Path: /auth/register
+            Method: POST
+
+  LoginUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Login"
+      Handler: app.lambda_handler
+      CodeUri: src/auth/login/
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+      Events:
+        LoginApiEvent:
+          Type: Api
+          Properties:
+            Path: /auth/login
+            Method: POST
+
+  GetQueueFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-GetQueue"
+      Handler: app.lambda_handler
+      CodeUri: src/queue/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TriageTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TriageTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+      Events:
+        QueueApi:
+          Type: Api
+          Properties:
+            Path: /triage/queue
+            Method: GET
+
+  AttendPatientFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Attend"
+      Handler: app.lambda_handler
+      CodeUri: src/attend/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TriageTable
+          REPORTS_BUCKET: !Ref ReportsBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TriageTable
+        - S3CrudPolicy:
+            BucketName: !Ref ReportsBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+                - kms:Encrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+      Events:
+        AttendApi:
+          Type: Api
+          Properties:
+            Path: /triage/{triageId}/attend
+            Method: POST
+
+  StartTriageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-StartTriage"
+      Handler: app.lambda_handler
+      CodeUri: src/triage_proxy/
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref TriageStateMachine
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartSyncExecution
+              Resource: !Ref TriageStateMachine
+      Events:
+        TriageApi:
+          Type: Api
+          Properties:
+            Path: /triage
+            Method: POST
+
+  # ============================================================
+  # Lambda Functions — Fluxo Síncrono (Step Functions)
+  # ============================================================
+  IdentifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Identify"
+      Handler: app.lambda_handler
+      CodeUri: src/identify/
+      Environment:
+        Variables:
+          PATIENTS_TABLE: !Ref PatientsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PatientsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+
+  VitalsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Vitals"
+      Handler: app.lambda_handler
+      CodeUri: src/vitals/
+
+  HistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-History"
+      Handler: app.lambda_handler
+      CodeUri: src/history/
+      Environment:
+        Variables:
+          PATIENTS_TABLE: !Ref PatientsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PatientsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+
+  SymptomsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Symptoms"
+      Handler: app.lambda_handler
+      CodeUri: src/symptoms/
+
+  ScoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Score"
+      Handler: app.lambda_handler
+      CodeUri: src/score/
+
+  PersistFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Persist"
+      Handler: app.lambda_handler
+      CodeUri: src/persist/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TriageTable
+          TOPIC_ARN: !Ref TriageEventsTopic
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TriageTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TriageEventsTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+
+  # ============================================================
+  # Lambda Assíncrona — Relatórios (trigger: SNS)
+  # ============================================================
+  AsyncReportsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Reports"
+      Handler: app.lambda_handler
+      CodeUri: src/async_reports/
+      Environment:
+        Variables:
+          REPORTS_BUCKET: !Ref ReportsBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref ReportsBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey*
+                - kms:Decrypt
+              Resource: !GetAtt MediFlowKMSKey.Arn
+      Events:
+        TriageSNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref TriageEventsTopic
+
+  CriticalAlertFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-Alerts"
+      Handler: app.lambda_handler
+      CodeUri: src/alerts/
+      Events:
+        CriticalEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref TriageEventsTopic
+            FilterPolicy:
+              urgencyLevel:
+                - CRITICAL
+
+  # ============================================================
+  # Step Functions — Express Workflow
+  # ============================================================
+  TriageStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Type: EXPRESS
+      DefinitionUri: statemachine/triage.asl.json
+      DefinitionSubstitutions:
+        IdentifyFunctionArn: !GetAtt IdentifyFunction.Arn
+        VitalsFunctionArn: !GetAtt VitalsFunction.Arn
+        HistoryFunctionArn: !GetAtt HistoryFunction.Arn
+        SymptomsFunctionArn: !GetAtt SymptomsFunction.Arn
+        ScoreFunctionArn: !GetAtt ScoreFunction.Arn
+        PersistFunctionArn: !GetAtt PersistFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref IdentifyFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref VitalsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref HistoryFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SymptomsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ScoreFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref PersistFunction
+      Events: {}
+
+# ============================================================
+# Outputs
+# ============================================================
+Outputs:
+  BaseApiEndpoint:
+    Description: URL Base da API (Use esta no config.js)
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
+  TriageApiEndpoint:
+    Description: URL do endpoint POST /triage
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/triage"
+
+  TriageStateMachineArn:
+    Description: ARN da State Machine de Triagem
+    Value: !Ref TriageStateMachine
+
+  TriageTableName:
+    Description: Nome da tabela DynamoDB
+    Value: !Ref TriageTable
+
+  ReportsBucketName:
+    Description: Nome do bucket S3 de relatórios
+    Value: !Ref ReportsBucket
+
+  TriageEventsTopicArn:
+    Description: ARN do tópico SNS
+    Value: !Ref TriageEventsTopic

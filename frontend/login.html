@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow - Acesso ao Sistema</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 60px auto;
+            padding: 40px;
+            text-align: center;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 15px;
+            cursor: pointer;
+            color: #888;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        .auth-tab.active {
+            color: #3b82f6;
+            border-bottom: 3px solid #3b82f6;
+        }
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+        }
+        .btn-auth {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3); }
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .checkbox-item input { width: auto; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="dashboard-body">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="auth-container glass-panel">
+        <div class="logo" style="justify-content: center; margin-bottom: 30px;">
+            <i class="fa-solid fa-house-medical-circle-check" style="font-size: 40px; color: #3b82f6;"></i>
+            <h1 style="font-size: 28px;">MediFlow</h1>
+        </div>
+
+        <div class="auth-tabs">
+            <div id="tabLogin" class="auth-tab active">Entrar</div>
+            <div id="tabRegister" class="auth-tab">Cadastrar</div>
+        </div>
+
+        <!-- Formulário de Login -->
+        <form id="loginForm">
+            <div class="form-group">
+                <label>CPF</label>
+                <input type="text" id="loginCpf" placeholder="000.000.000-00" required>
+            </div>
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="loginPassword" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn-auth">Acessar Portal</button>
+        </form>
+
+        <!-- Formulário de Cadastro -->
+        <form id="registerForm" class="hidden">
+            <div class="form-group">
+                <label>Nome Completo</label>
+                <input type="text" id="regName" placeholder="Seu nome" required>
+            </div>
+            <div class="form-group">
+                <label>CPF</label>
+                <input type="text" id="regCpf" placeholder="000.000.000-00" required>
+            </div>
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="regPassword" placeholder="Crie uma senha" required>
+            </div>
+            <div class="form-group">
+                <label>Histórico de Saúde (Selecione)</label>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="disease" value="diabetes"> Diabetes</label>
+                    <label class="checkbox-item"><input type="checkbox" name="disease" value="hipertensao"> Hipertensão</label>
+                    <label class="checkbox-item"><input type="checkbox" name="disease" value="asma"> Asma/DPOC</label>
+                    <label class="checkbox-item"><input type="checkbox" name="disease" value="doenca_cardiaca"> Doença Cardíaca</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Medicamentos em Uso (separados por vírgula)</label>
+                <textarea id="regMedications" rows="2" placeholder="Ex: Insulina, Losartana"></textarea>
+            </div>
+            <button type="submit" class="btn-auth">Criar Conta</button>
+        </form>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>

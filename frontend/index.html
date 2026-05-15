@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow - Triagem Inteligente</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <script>
+        // Verificação de Segurança de Sessão
+        const user = JSON.parse(localStorage.getItem('mediflow_user'));
+        if (!user) {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    
+    <div class="container glass-panel">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-house-medical"></i>
+                <h1>MediFlow <span>Triagem Digital</span></h1>
+            </div>
+            <div class="user-info-header">
+                <span id="welcomeMsg">Olá, <strong>Paciente</strong></span>
+                <button id="btnLogout" class="btn-secondary" style="padding: 8px 15px; font-size: 13px;">Sair</button>
+            </div>
+        </header>
+
+        <form id="triageForm">
+            <!-- Dados Automáticos -->
+            <div class="section-title"><i class="fa-solid fa-user-check"></i> Sua Identidade</div>
+            <div class="info-alert">
+                <i class="fa-solid fa-circle-info"></i>
+                <p>Seus dados clínicos e CPF foram carregados automaticamente da sua conta segura.</p>
+            </div>
+
+            <!-- Sinais Vitais -->
+            <div class="section-title"><i class="fa-solid fa-notes-medical"></i> Sinais Vitais</div>
+            <div class="grid-2">
+                <div class="input-group">
+                    <label for="heartRate">Freq. Cardíaca (bpm)</label>
+                    <input type="number" id="heartRate" value="85" required>
+                </div>
+                <div class="input-group">
+                    <label for="spo2">SpO2 (%)</label>
+                    <input type="number" id="spo2" value="98" required>
+                </div>
+                <div class="input-group">
+                    <label for="temperature">Temperatura (°C)</label>
+                    <input type="number" id="temperature" step="0.1" value="36.5" required>
+                </div>
+                <div class="input-group">
+                    <label for="systolicBP">Pressão Sistólica (mmHg)</label>
+                    <input type="number" id="systolicBP" value="120" required>
+                </div>
+            </div>
+
+            <!-- Sintomas Reportados -->
+            <div class="section-title"><i class="fa-solid fa-head-side-cough"></i> Sintomas Relatados</div>
+            <div class="symptoms-grid" id="symptomsGrid">
+                <!-- Críticos -->
+                <div class="symptom-chip critical" data-key="dor_no_peito">Dor no Peito</div>
+                <div class="symptom-chip critical" data-key="dificuldade_respiratoria">Falta de Ar</div>
+                <div class="symptom-chip critical" data-key="perda_consciencia">Perda de Consciência</div>
+                <div class="symptom-chip critical" data-key="paralisia_subita">Paralisia Súbita</div>
+                <!-- Altos -->
+                <div class="symptom-chip high" data-key="dor_abdominal_intensa">Dor Abdominal Forte</div>
+                <div class="symptom-chip high" data-key="sangramento_ativo">Sangramento</div>
+                <div class="symptom-chip high" data-key="febre_persistente">Febre Persistente</div>
+                <!-- Médios/Baixos -->
+                <div class="symptom-chip medium" data-key="tontura">Tontura</div>
+                <div class="symptom-chip medium" data-key="nausea">Náusea / Vômito</div>
+                <div class="symptom-chip low" data-key="dor_de_cabeca_leve">Dor de Cabeça Leve</div>
+                <div class="symptom-chip low" data-key="dor_muscular">Dor Muscular</div>
+                <div class="symptom-chip low" data-key="dor_de_garganta">Dor de Garganta</div>
+            </div>
+
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <i class="fa-solid fa-bolt"></i> Enviar Triagem para IA
+            </button>
+        </form>
+
+        <!-- Resultados -->
+        <div id="resultModal" class="result-modal glass-panel hidden">
+            <div class="result-header">
+                <h2>Resultado da Triagem</h2>
+                <button class="close-btn" id="closeResult"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="urgency-badge" id="urgencyBadge">
+                <div class="urgency-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="urgency-info">
+                    <h3 id="urgencyTitle">CRITICAL</h3>
+                    <p>Score de Risco: <span id="scoreValue">...</span> pts</p>
+                </div>
+            </div>
+            <div class="explanation-box">
+                <h4>Justificativas do Algoritmo</h4>
+                <ul id="explanationList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loader-overlay hidden" id="loader">
+        <div class="spinner"></div>
+        <p>Analisando sinais vitais na nuvem...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

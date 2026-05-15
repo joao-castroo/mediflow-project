@@ -1,0 +1,116 @@
+{
+  "Comment": "MediFlow - Fluxo de Triagem Clínica (Vitais + Doenças + Sintomas)",
+  "StartAt": "IdentifyPatient",
+  "States": {
+    "IdentifyPatient": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${IdentifyFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "patient.$": "$.Payload"
+      },
+      "ResultPath": "$.identifyResult",
+      "Next": "ParallelProcessing"
+    },
+    "ParallelProcessing": {
+      "Type": "Parallel",
+      "ResultPath": "$.parallelResults",
+      "Branches": [
+        {
+          "StartAt": "ValidateVitals",
+          "States": {
+            "ValidateVitals": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${VitalsFunctionArn}",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "vitals.$": "$.Payload"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "FetchHistory",
+          "States": {
+            "FetchHistory": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${HistoryFunctionArn}",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "history.$": "$.Payload"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "ClassifySymptoms",
+          "States": {
+            "ClassifySymptoms": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${SymptomsFunctionArn}",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "symptoms.$": "$.Payload"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "CalculateScore"
+    },
+    "CalculateScore": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${ScoreFunctionArn}",
+        "Payload": {
+          "patient.$": "$.identifyResult.patient",
+          "vitals.$": "$.parallelResults[0].vitals",
+          "history.$": "$.parallelResults[1].history",
+          "symptoms.$": "$.parallelResults[2].symptoms"
+        }
+      },
+      "ResultSelector": {
+        "scoring.$": "$.Payload"
+      },
+      "ResultPath": "$.scoreResult",
+      "Next": "PersistAndNotify"
+    },
+    "PersistAndNotify": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PersistFunctionArn}",
+        "Payload": {
+          "patient.$": "$.identifyResult.patient",
+          "vitals.$": "$.parallelResults[0].vitals",
+          "history.$": "$.parallelResults[1].history",
+          "symptoms.$": "$.parallelResults[2].symptoms",
+          "scoring.$": "$.scoreResult.scoring"
+        }
+      },
+      "ResultSelector": {
+        "triageId.$": "$.Payload.triageId",
+        "riskScore.$": "$.Payload.riskScore",
+        "urgencyLevel.$": "$.Payload.urgencyLevel",
+        "explanation.$": "$.Payload.explanation"
+      },
+      "End": true
+    }
+  }
+}
