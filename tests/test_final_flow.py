@@ -3,6 +3,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 import sys
 import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "tests"))
+from support.fake_boto3 import install_if_missing
+
+install_if_missing()
 
 # Mock do Boto3 para não precisar de conexão real no teste local
 class TestMediFlowFlow(unittest.TestCase):
@@ -19,7 +26,10 @@ class TestMediFlowFlow(unittest.TestCase):
         
         # Importa a lambda de registro usando importlib para evitar conflitos
         import importlib.util
-        spec = importlib.util.spec_from_file_location("register_app", "src/auth/register/app.py")
+        spec = importlib.util.spec_from_file_location(
+            "register_app",
+            PROJECT_ROOT / "src" / "functions" / "api" / "auth" / "user" / "register" / "app.py",
+        )
         register_app = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(register_app)
         
@@ -46,7 +56,10 @@ class TestMediFlowFlow(unittest.TestCase):
         
         # Importa a lambda de login usando importlib
         import importlib.util
-        spec = importlib.util.spec_from_file_location("login_app", "src/auth/login/app.py")
+        spec = importlib.util.spec_from_file_location(
+            "login_app",
+            PROJECT_ROOT / "src" / "functions" / "api" / "auth" / "user" / "login" / "app.py",
+        )
         login_app = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(login_app)
         
@@ -78,11 +91,11 @@ class TestMediFlowFlow(unittest.TestCase):
             'frontend/index.html',
             'frontend/login.html',
             'frontend/dashboard.html',
-            'frontend/auth.js',
-            'frontend/config.js'
+            'frontend/assets/js/auth.js',
+            'frontend/assets/js/config.js'
         ]
         for f in files:
-            self.assertTrue(os.path.exists(f), f"Arquivo faltando: {f}")
+            self.assertTrue((PROJECT_ROOT / f).exists(), f"Arquivo faltando: {f}")
         print("Integridade do Frontend: OK")
 
 if __name__ == '__main__':

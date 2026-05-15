@@ -29,7 +29,7 @@ O trabalho propõe implementar uma solução de triagem médica com foco em:
 O repositório já contém:
 
 - Infraestrutura AWS SAM em `template.yaml`.
-- State Machine em `statemachine/triage.asl.json`.
+- State Machine em `infra/statemachine/triage.asl.json`.
 - Lambdas de autenticação, triagem, fila, atendimento, alerta e relatório.
 - Frontend vanilla em `frontend/`.
 - Testes locais exploratórios em Python.
@@ -43,35 +43,45 @@ mediflow-project/
 ├── README.md
 ├── samconfig.toml
 ├── template.yaml
-├── statemachine/
-│   └── triage.asl.json
+├── infra/
+│   └── statemachine/
+│       └── triage.asl.json
 ├── frontend/
 │   ├── login.html
 │   ├── index.html
 │   ├── dashboard.html
-│   ├── auth.js
-│   ├── app.js
-│   ├── dashboard.js
-│   ├── config.js
-│   └── style.css
+│   └── assets/
+│       ├── css/
+│       │   └── style.css
+│       └── js/
+│           ├── config.js
+│           ├── auth.js
+│           ├── app.js
+│           └── dashboard.js
 ├── src/
-│   ├── auth/
-│   │   ├── login/app.py
-│   │   └── register/app.py
-│   ├── triage_proxy/app.py
-│   ├── identify/app.py
-│   ├── vitals/app.py
-│   ├── history/app.py
-│   ├── symptoms/app.py
-│   ├── score/app.py
-│   ├── persist/app.py
-│   ├── queue/app.py
-│   ├── attend/app.py
-│   ├── alerts/app.py
-│   └── async_reports/app.py
-├── test_auth.py
-├── test_final_flow.py
-└── test_locally.py
+│   └── functions/
+│       ├── api/
+│       │   ├── auth/user/
+│       │   │   ├── login/app.py
+│       │   │   └── register/app.py
+│       │   └── triage/
+│       │       ├── start/app.py
+│       │       ├── queue/app.py
+│       │       └── attend/app.py
+│       ├── workflow/
+│       │   ├── identify/app.py
+│       │   ├── vitals/app.py
+│       │   ├── history/app.py
+│       │   ├── symptoms/app.py
+│       │   ├── score/app.py
+│       │   └── persist/app.py
+│       └── async/
+│           ├── reports/app.py
+│           └── alerts/app.py
+└── tests/
+    ├── test_auth.py
+    ├── test_final_flow.py
+    └── test_locally.py
 ```
 
 ## Arquitetura AWS
@@ -174,7 +184,7 @@ O frontend está em `frontend/` e possui três telas principais:
 - `index.html`: formulário de triagem do paciente.
 - `dashboard.html`: fila de pacientes aguardando atendimento.
 
-O arquivo `frontend/config.js` define a URL base da API:
+O arquivo `frontend/assets/js/config.js` define a URL base da API:
 
 ```js
 API_URL: 'https://c79cspmegc.execute-api.us-east-1.amazonaws.com/Prod'
@@ -197,7 +207,7 @@ sam build
 sam deploy --guided
 ```
 
-Após o deploy, copie o output `BaseApiEndpoint` para `frontend/config.js`.
+Após o deploy, copie o output `BaseApiEndpoint` para `frontend/assets/js/config.js`.
 
 Exemplo de chamada:
 
@@ -236,18 +246,18 @@ Pontos que ainda precisam ser tratados antes de produção:
 Existem três scripts de teste:
 
 ```bash
-python3 test_auth.py
-python3 test_locally.py
-python3 -m unittest test_final_flow.py
+python3 tests/test_auth.py
+python3 tests/test_locally.py
+python3 -m unittest tests/test_final_flow.py
 ```
 
-No ambiente atual, eles dependem de `boto3`. Se `boto3` não estiver instalado localmente, os testes falham com `ModuleNotFoundError`.
+Os testes instalam um stub local de `boto3` quando o pacote não existe no ambiente, permitindo validar a lógica principal sem credenciais AWS.
 
 ## Pendências Técnicas
 
 Pendências identificadas no estado atual do código:
 
-- Corrigir `frontend/auth.js`: o cadastro monta `payload`, mas envia uma variável inexistente chamada `conditions`.
+- Corrigir `frontend/assets/js/auth.js`: o cadastro monta `payload`, mas envia uma variável inexistente chamada `conditions`.
 - Alinhar a origem do histórico clínico: `PatientsTable` usa chave `patientId`, enquanto partes do fluxo usam `cpf`.
 - Definir se usuários e pacientes devem viver na mesma tabela ou em tabelas separadas.
 - Remover `__pycache__/` do controle de versão antes do primeiro commit.

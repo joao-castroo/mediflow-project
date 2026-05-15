@@ -147,7 +147,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Register"
       Handler: app.lambda_handler
-      CodeUri: src/auth/register/
+      CodeUri: src/functions/api/auth/user/register/
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -172,7 +172,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Login"
       Handler: app.lambda_handler
-      CodeUri: src/auth/login/
+      CodeUri: src/functions/api/auth/user/login/
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -196,7 +196,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-GetQueue"
       Handler: app.lambda_handler
-      CodeUri: src/queue/
+      CodeUri: src/functions/api/triage/queue/
       Environment:
         Variables:
           TABLE_NAME: !Ref TriageTable
@@ -221,7 +221,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Attend"
       Handler: app.lambda_handler
-      CodeUri: src/attend/
+      CodeUri: src/functions/api/triage/attend/
       Environment:
         Variables:
           TABLE_NAME: !Ref TriageTable
@@ -250,7 +250,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-StartTriage"
       Handler: app.lambda_handler
-      CodeUri: src/triage_proxy/
+      CodeUri: src/functions/api/triage/start/
       Environment:
         Variables:
           STATE_MACHINE_ARN: !Ref TriageStateMachine
@@ -275,7 +275,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Identify"
       Handler: app.lambda_handler
-      CodeUri: src/identify/
+      CodeUri: src/functions/workflow/identify/
       Environment:
         Variables:
           PATIENTS_TABLE: !Ref PatientsTable
@@ -294,14 +294,14 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Vitals"
       Handler: app.lambda_handler
-      CodeUri: src/vitals/
+      CodeUri: src/functions/workflow/vitals/
 
   HistoryFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AWS::StackName}-History"
       Handler: app.lambda_handler
-      CodeUri: src/history/
+      CodeUri: src/functions/workflow/history/
       Environment:
         Variables:
           PATIENTS_TABLE: !Ref PatientsTable
@@ -320,21 +320,21 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Symptoms"
       Handler: app.lambda_handler
-      CodeUri: src/symptoms/
+      CodeUri: src/functions/workflow/symptoms/
 
   ScoreFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Score"
       Handler: app.lambda_handler
-      CodeUri: src/score/
+      CodeUri: src/functions/workflow/score/
 
   PersistFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Persist"
       Handler: app.lambda_handler
-      CodeUri: src/persist/
+      CodeUri: src/functions/workflow/persist/
       Environment:
         Variables:
           TABLE_NAME: !Ref TriageTable
@@ -359,7 +359,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Reports"
       Handler: app.lambda_handler
-      CodeUri: src/async_reports/
+      CodeUri: src/functions/async/reports/
       Environment:
         Variables:
           REPORTS_BUCKET: !Ref ReportsBucket
@@ -383,7 +383,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${AWS::StackName}-Alerts"
       Handler: app.lambda_handler
-      CodeUri: src/alerts/
+      CodeUri: src/functions/async/alerts/
       Events:
         CriticalEvent:
           Type: SNS
@@ -400,7 +400,7 @@ Resources:
     Type: AWS::Serverless::StateMachine
     Properties:
       Type: EXPRESS
-      DefinitionUri: statemachine/triage.asl.json
+      DefinitionUri: infra/statemachine/triage.asl.json
       DefinitionSubstitutions:
         IdentifyFunctionArn: !GetAtt IdentifyFunction.Arn
         VitalsFunctionArn: !GetAtt VitalsFunction.Arn

@@ -2,6 +2,13 @@ import json
 import sys
 import os
 import importlib.util
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "tests"))
+from support.fake_boto3 import install_if_missing
+
+install_if_missing()
 
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -26,7 +33,7 @@ def test_full_flow():
     
     # 1. Teste Identify
     print("\n[1] Testando Identify...")
-    identify_path = os.path.join(os.getcwd(), 'src', 'identify', 'app.py')
+    identify_path = PROJECT_ROOT / 'src' / 'functions' / 'workflow' / 'identify' / 'app.py'
     identify_app = load_module('identify_app', identify_path)
     
     event_id = {"patientId": "12345"}
@@ -38,7 +45,7 @@ def test_full_flow():
 
     # 2. Teste Score
     print("\n[2] Testando Score...")
-    score_path = os.path.join(os.getcwd(), 'src', 'score', 'app.py')
+    score_path = PROJECT_ROOT / 'src' / 'functions' / 'workflow' / 'score' / 'app.py'
     score_app = load_module('score_app', score_path)
     
     score_event = {
@@ -52,7 +59,7 @@ def test_full_flow():
 
     # 3. Teste Persist (Onde estava o erro de undefined)
     print("\n[3] Testando Persist...")
-    persist_path = os.path.join(os.getcwd(), 'src', 'persist', 'app.py')
+    persist_path = PROJECT_ROOT / 'src' / 'functions' / 'workflow' / 'persist' / 'app.py'
     persist_app = load_module('persist_app', persist_path)
     
     # Simulando EXATAMENTE como o Step Functions envia os dados (dentro de identifyResult e parallelResults)
@@ -74,7 +81,7 @@ def test_full_flow():
 
     # 4. Teste Alerta Crítico (SNS Trigger)
     print("\n[4] Testando Alerta Crítico (SNS)...")
-    alerts_path = os.path.join(os.getcwd(), 'src', 'alerts', 'app.py')
+    alerts_path = PROJECT_ROOT / 'src' / 'functions' / 'async' / 'alerts' / 'app.py'
     alerts_app = load_module('alerts_app', alerts_path)
     
     sns_event = {

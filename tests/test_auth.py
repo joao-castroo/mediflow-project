@@ -2,6 +2,13 @@ import json
 import sys
 import os
 import importlib.util
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "tests"))
+from support.fake_boto3 import install_if_missing
+
+install_if_missing()
 
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -24,8 +31,8 @@ def test_auth_flow():
     print("=== TESTANDO SISTEMA DE AUTENTICACAO ===")
     
     # 1. Carregar Módulos
-    reg_path = os.path.join(os.getcwd(), 'src', 'auth', 'register', 'app.py')
-    login_path = os.path.join(os.getcwd(), 'src', 'auth', 'login', 'app.py')
+    reg_path = PROJECT_ROOT / 'src' / 'functions' / 'api' / 'auth' / 'user' / 'register' / 'app.py'
+    login_path = PROJECT_ROOT / 'src' / 'functions' / 'api' / 'auth' / 'user' / 'login' / 'app.py'
     
     reg_app = load_module('reg_app', reg_path)
     login_app = load_module('login_app', login_path)
