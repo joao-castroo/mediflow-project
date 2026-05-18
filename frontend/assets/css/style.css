@@ -286,6 +286,44 @@ input:checked + .slider:before { transform: translateX(20px); }
 .urgency-info p { color: var(--text-secondary); font-size: 15px; margin-top: 5px; }
 .triage-id { font-family: monospace; font-size: 12px !important; opacity: 0.5; margin-top: 10px !important;}
 
+.wait-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding: 18px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 14px;
+}
+
+.wait-card.hidden {
+    display: none;
+}
+
+.wait-card div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.wait-card span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.wait-card strong {
+    color: white;
+    font-size: 24px;
+}
+
+.wait-card p {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
 .explanation-box {
     background: rgba(0,0,0,0.3);
     padding: 20px;

@@ -139,6 +139,72 @@ Resources:
               SSEAlgorithm: 'aws:kms'
               KMSMasterKeyID: !Ref MediFlowKMSKey
 
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !Ref MediFlowKMSKey
+
+  # ============================================================
+  # Athena / Glue — Consulta dos relatórios operacionais em S3
+  # ============================================================
+  ReportsGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: mediflow_reports
+        Description: Database Athena/Glue para relatórios de triagem do MediFlow no S3.
+
+  ReportsGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ReportsGlueDatabase
+      TableInput:
+        Name: triage_reports
+        Description: Relatórios operacionais JSON gerados pela Lambda AsyncReports.
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: json
+          compressionType: none
+          typeOfData: file
+        StorageDescriptor:
+          Location: !Sub "s3://${ReportsBucket}/reports/"
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          Columns:
+            - Name: reporttype
+              Type: string
+            - Name: generatedat
+              Type: string
+            - Name: source
+              Type: string
+            - Name: triagedata
+              Type: "struct<triageid:string,patientid:string,riskscore:int,urgencylevel:string,explanation:array<string>,eventtimestamp:string>"
+            - Name: metadata
+              Type: "struct<eventtype:string,lambdarequestid:string>"
+
+  ReportsAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub "mediflow-reports-${AWS::StackName}"
+      Description: Workgroup Athena para consultar relatórios JSON do MediFlow.
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${AthenaResultsBucket}/athena-results/"
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: !GetAtt MediFlowKMSKey.Arn
+
   # ============================================================
   # Lambda Functions — API de Gestão (Cadastro e Fila)
   # ============================================================
@@ -278,10 +344,10 @@ Resources:
       CodeUri: src/functions/workflow/identify/
       Environment:
         Variables:
-          PATIENTS_TABLE: !Ref PatientsTable
+          USERS_TABLE: !Ref UsersTable
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref PatientsTable
+            TableName: !Ref UsersTable
         - Statement:
             - Effect: Allow
               Action:
@@ -304,10 +370,10 @@ Resources:
       CodeUri: src/functions/workflow/history/
       Environment:
         Variables:
-          PATIENTS_TABLE: !Ref PatientsTable
+          USERS_TABLE: !Ref UsersTable
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref PatientsTable
+            TableName: !Ref UsersTable
         - Statement:
             - Effect: Allow
               Action:
@@ -393,6 +459,12 @@ Resources:
               urgencyLevel:
                 - CRITICAL
 
+  TriageStateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/vendedlogs/states/${AWS::StackName}-triage"
+      RetentionInDays: 14
+
   # ============================================================
   # Step Functions — Express Workflow
   # ============================================================
@@ -408,6 +480,14 @@ Resources:
         SymptomsFunctionArn: !GetAtt SymptomsFunction.Arn
         ScoreFunctionArn: !GetAtt ScoreFunction.Arn
         PersistFunctionArn: !GetAtt PersistFunction.Arn
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt TriageStateMachineLogGroup.Arn
+        IncludeExecutionData: true
+        Level: ALL
+      Tracing:
+        Enabled: true
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref IdentifyFunction
@@ -421,6 +501,25 @@ Resources:
             FunctionName: !Ref ScoreFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref PersistFunction
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogDelivery
+                - logs:GetLogDelivery
+                - logs:UpdateLogDelivery
+                - logs:DeleteLogDelivery
+                - logs:ListLogDeliveries
+                - logs:PutResourcePolicy
+                - logs:DescribeResourcePolicies
+                - logs:DescribeLogGroups
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+                - xray:GetSamplingRules
+                - xray:GetSamplingTargets
+              Resource: "*"
       Events: {}
 
 # ============================================================
@@ -446,6 +545,42 @@ Outputs:
   ReportsBucketName:
     Description: Nome do bucket S3 de relatórios
     Value: !Ref ReportsBucket
+
+  AthenaDatabaseName:
+    Description: Database Athena/Glue para consultar os relatórios S3
+    Value: !Ref ReportsGlueDatabase
+
+  AthenaReportsTableName:
+    Description: Tabela Athena/Glue dos relatórios de triagem
+    Value: triage_reports
+
+  AthenaWorkGroupName:
+    Description: Workgroup Athena configurado para os relatórios MediFlow
+    Value: !Ref ReportsAthenaWorkGroup
+
+  AthenaResultsBucketName:
+    Description: Bucket S3 para resultados das consultas Athena
+    Value: !Ref AthenaResultsBucket
+
+  AthenaQueryEditorUrl:
+    Description: Console Athena Query Editor
+    Value: !Sub "https://console.aws.amazon.com/athena/home?region=${AWS::Region}#/query-editor"
+
+  TriageStateMachineConsoleUrl:
+    Description: Console Step Functions com o fluxo visual da triagem
+    Value: !Sub "https://console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${TriageStateMachine}"
+
+  TriageExecutionsConsoleUrl:
+    Description: Console Step Functions para visualizar execucoes da triagem
+    Value: !Sub "https://console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${TriageStateMachine}?tab=executions"
+
+  TriageStateMachineLogGroupName:
+    Description: Log group CloudWatch com eventos detalhados das execucoes Express
+    Value: !Ref TriageStateMachineLogGroup
+
+  CloudFormationStackUrl:
+    Description: Console CloudFormation do stack MediFlow
+    Value: !Sub "https://console.aws.amazon.com/cloudformation/home?region=${AWS::Region}#/stacks/stackinfo?stackId=${AWS::StackId}"
 
   TriageEventsTopicArn:
     Description: ARN do tópico SNS

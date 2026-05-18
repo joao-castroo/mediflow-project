@@ -7,7 +7,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource('dynamodb')
-PATIENTS_TABLE = os.environ.get('PATIENTS_TABLE', 'PatientsTable')
+USERS_TABLE = os.environ.get('USERS_TABLE') or os.environ.get('PATIENTS_TABLE', 'UsersTable')
 
 def lambda_handler(event, context):
     """
@@ -25,8 +25,8 @@ def lambda_handler(event, context):
     logger.info(f"Buscando histórico para o paciente: {patient_id}")
     
     try:
-        table = dynamodb.Table(PATIENTS_TABLE)
-        response = table.get_item(Key={'patientId': patient_id})
+        table = dynamodb.Table(USERS_TABLE)
+        response = table.get_item(Key={'cpf': patient_id})
         
         patient_data = response.get('Item', {})
         

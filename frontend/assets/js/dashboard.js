@@ -1,5 +1,5 @@
 // ==========================================
-// DASHBOARD LOGIC (Fila de Pacientes REAL)
+// DASHBOARD LOGIC (Fila de Pacientes)
 // ==========================================
 
 const queueList = document.getElementById('queueList');
@@ -11,6 +11,11 @@ const emergencyOverlay = document.getElementById('emergencyOverlay');
 const emergencyPatientName = document.getElementById('emergencyPatientName');
 const closeEmergencyBtn = document.getElementById('closeEmergency');
 const btnAttendNow = document.getElementById('btnAttendNow');
+const activeUser = JSON.parse(localStorage.getItem('mediflow_user'));
+
+if (activeUser && activeUser.role !== 'doctor') {
+    window.location.href = 'index.html';
+}
 
 let currentEmergencyTriageId = null;
 
@@ -28,6 +33,12 @@ btnAttendNow.addEventListener('click', () => {
 
 async function loadQueue() {
     const apiUrl = window.MEDI_CONFIG.API_URL;
+
+    if (window.MEDI_CONFIG.LOCAL_MODE) {
+        const queue = window.MediFlowLocal.getQueue().sort(sortQueue);
+        renderQueue(queue);
+        return;
+    }
 
     try {
         // Chamada Real para a AWS
@@ -54,6 +65,15 @@ function formatTime(isoString) {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function getPatientDisplayName(patient) {
+    if (patient.fullName && patient.fullName !== 'Erro na Identificação') {
+        return patient.fullName;
+    }
+    if (patient.patientName) return patient.patientName;
+    if (patient.patientId && patient.patientId !== 'N/A') return `CPF: ${patient.patientId}`;
+    return 'Paciente não identificado';
+}
+
 function renderQueue(queue) {
     queueList.innerHTML = '';
     let criticalCount = 0;
@@ -75,7 +95,7 @@ function renderQueue(queue) {
                 <div class="queue-card-left">
                     <div class="queue-time"><i class="fa-regular fa-clock"></i> ${formatTime(patient.eventTimestamp || patient.timestamp)}</div>
                     <div class="queue-patient">
-                        <h3>${patient.fullName || 'CPF: ' + patient.patientId}</h3>
+                        <h3>${getPatientDisplayName(patient)}</h3>
                         <span class="queue-score">Score: ${patient.riskScore}</span>
                     </div>
                 </div>
@@ -96,6 +116,13 @@ window.callPatient = async function(triageId) {
 
     try {
         if (!confirm("Confirmar atendimento do paciente?")) return;
+
+        if (window.MEDI_CONFIG.LOCAL_MODE) {
+            window.MediFlowLocal.attend(triageId);
+            alert("Atendimento registrado localmente!");
+            loadQueue();
+            return;
+        }
         
         const response = await fetch(`${apiUrl}/triage/${triageId}/attend`, { method: 'POST' });
         if (!response.ok) throw new Error("Erro ao registrar atendimento.");
@@ -107,14 +134,18 @@ window.callPatient = async function(triageId) {
 }
 
 document.getElementById('clearQueueBtn').addEventListener('click', () => {
-    localStorage.removeItem('mediflow_queue');
+    if (window.MEDI_CONFIG.LOCAL_MODE) {
+        window.MediFlowLocal.clearQueue();
+    } else {
+        localStorage.removeItem('mediflow_queue');
+    }
     loadQueue();
 });
 
 function showEmergencyAlert(patient) {
     notifiedTriageIds.add(patient.triageId);
     currentEmergencyTriageId = patient.triageId;
-    emergencyPatientName.innerText = patient.fullName || 'CPF: ' + patient.patientId;
+    emergencyPatientName.innerText = getPatientDisplayName(patient);
     emergencyOverlay.classList.remove('hidden');
     
     // Tenta tocar um som de alerta (navegadores podem bloquear se não houver interação prévia)
@@ -133,6 +164,6 @@ setInterval(loadQueue, 2000);
 // Indicador visual de que o sistema está monitorando
 const header = document.querySelector('header');
 const liveIndicator = document.createElement('div');
-liveIndicator.innerHTML = '<span class="live-dot"></span> LIVE MONITORING';
+liveIndicator.innerHTML = `<span class="live-dot"></span> ${window.MEDI_CONFIG.LOCAL_MODE ? 'MODO LOCAL' : 'LIVE MONITORING'}`;
 liveIndicator.className = 'live-indicator';
 header.appendChild(liveIndicator);

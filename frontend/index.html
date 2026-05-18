@@ -37,7 +37,7 @@
             <div class="section-title"><i class="fa-solid fa-user-check"></i> Sua Identidade</div>
             <div class="info-alert">
                 <i class="fa-solid fa-circle-info"></i>
-                <p>Seus dados clínicos e CPF foram carregados automaticamente da sua conta segura.</p>
+                <p>Modo local ativo: seus dados ficam salvos apenas neste navegador para teste do fluxo.</p>
             </div>
 
             <!-- Sinais Vitais -->
@@ -82,7 +82,7 @@
             </div>
 
             <button type="submit" class="btn-primary" id="submitBtn">
-                <i class="fa-solid fa-bolt"></i> Enviar Triagem para IA
+                <i class="fa-solid fa-bolt"></i> Executar Triagem Local
             </button>
         </form>
 
@@ -99,6 +99,17 @@
                     <p>Score de Risco: <span id="scoreValue">...</span> pts</p>
                 </div>
             </div>
+            <div class="wait-card hidden" id="waitCard">
+                <div>
+                    <span>Posição na fila</span>
+                    <strong id="queuePosition">--</strong>
+                </div>
+                <div>
+                    <span>Tempo estimado</span>
+                    <strong id="estimatedWait">--</strong>
+                </div>
+                <p id="queueMessage">Aguardando cálculo da fila.</p>
+            </div>
             <div class="explanation-box">
                 <h4>Justificativas do Algoritmo</h4>
                 <ul id="explanationList"></ul>
@@ -109,7 +120,7 @@
     <!-- Loading Overlay -->
     <div class="loader-overlay hidden" id="loader">
         <div class="spinner"></div>
-        <p>Analisando sinais vitais na nuvem...</p>
+        <p>Analisando sinais vitais localmente...</p>
     </div>
 
     <script src="assets/js/app.js"></script>

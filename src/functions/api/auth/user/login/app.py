@@ -43,8 +43,11 @@ def lambda_handler(event, context):
         profile = {
             "cpf": user['cpf'],
             "fullName": user['fullName'],
+            "role": user.get('role', 'patient'),
             "chronicConditions": user.get('chronicConditions', []),
-            "medications": user.get('medications', [])
+            "medications": user.get('medications', []),
+            "specialty": user.get('specialty', ''),
+            "crm": user.get('crm', '')
         }
         
         logger.info(f"Login realizado: {cpf}")

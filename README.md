@@ -184,6 +184,20 @@ O frontend está em `frontend/` e possui três telas principais:
 - `index.html`: formulário de triagem do paciente.
 - `dashboard.html`: fila de pacientes aguardando atendimento.
 
+No modo local, o perfil do usuário é definido pelo CPF:
+
+- CPFs presentes na lista local de médicos entram como `doctor` e são redirecionados para `dashboard.html`.
+- Demais CPFs entram como `patient` e são redirecionados para `index.html`.
+
+Usuários locais de demonstração:
+
+| Perfil | CPF | Senha | Destino |
+|---|---|---|---|
+| Paciente | `11111111111` | `123456` | Triagem |
+| Médico | `22222222222` | `123456` | Dashboard |
+
+Após executar uma triagem local, o paciente visualiza a posição na fila, número de pessoas à frente e tempo estimado de espera.
+
 O arquivo `frontend/assets/js/config.js` define a URL base da API:
 
 ```js

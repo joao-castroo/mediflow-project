@@ -9,6 +9,9 @@ const welcomeMsg = document.getElementById('welcomeMsg');
 // Carrega dados do usuário logado
 const activeUser = JSON.parse(localStorage.getItem('mediflow_user'));
 if (activeUser) {
+    if (activeUser.role === 'doctor') {
+        window.location.href = 'dashboard.html';
+    }
     welcomeMsg.innerHTML = `Olá, <strong>${activeUser.fullName.split(' ')[0]}</strong>`;
 }
 
@@ -51,8 +54,18 @@ triageForm.addEventListener('submit', async (e) => {
         symptoms: Array.from(selectedSymptoms),
         // O histórico vem do cadastro automático
         chronicConditions: activeUser.chronicConditions || [],
-        medications: activeUser.medications || []
+        medications: activeUser.medications || [],
+        fullName: activeUser.fullName
     };
+
+    if (window.MEDI_CONFIG.LOCAL_MODE) {
+        setTimeout(() => {
+            const data = window.MediFlowLocal.submitTriage(payload);
+            showResult(data);
+            loader.classList.add('hidden');
+        }, 400);
+        return;
+    }
 
     try {
         const response = await fetch(`${window.MEDI_CONFIG.API_URL}/triage`, {
@@ -78,6 +91,7 @@ triageForm.addEventListener('submit', async (e) => {
 function showResult(data) {
     document.getElementById('urgencyTitle').innerText = data.urgencyLevel;
     document.getElementById('scoreValue').innerText = data.riskScore;
+    updateWaitInfo(data);
     
     const list = document.getElementById('explanationList');
     list.innerHTML = '';
@@ -89,13 +103,36 @@ function showResult(data) {
             list.appendChild(li);
         });
     } else {
-        list.innerHTML = '<li>Processamento concluído pela AWS.</li>';
+        list.innerHTML = `<li>Processamento concluído ${window.MEDI_CONFIG.LOCAL_MODE ? 'localmente' : 'pela AWS'}.</li>`;
     }
 
     const badge = document.getElementById('urgencyBadge');
     badge.className = `urgency-badge level-${data.urgencyLevel}`;
     
     resultModal.classList.remove('hidden');
+}
+
+function updateWaitInfo(data) {
+    const waitCard = document.getElementById('waitCard');
+    const queuePosition = document.getElementById('queuePosition');
+    const estimatedWait = document.getElementById('estimatedWait');
+    const queueMessage = document.getElementById('queueMessage');
+
+    if (!waitCard || !window.MEDI_CONFIG.LOCAL_MODE || !data.triageId) {
+        if (waitCard) waitCard.classList.add('hidden');
+        return;
+    }
+
+    const waitInfo = window.MediFlowLocal.getWaitInfo(data.triageId);
+    if (!waitInfo) {
+        waitCard.classList.add('hidden');
+        return;
+    }
+
+    queuePosition.innerText = `${waitInfo.position}º`;
+    estimatedWait.innerText = `${waitInfo.estimatedMinutes} min`;
+    queueMessage.innerText = waitInfo.message;
+    waitCard.classList.remove('hidden');
 }
 
 closeResult.addEventListener('click', () => {

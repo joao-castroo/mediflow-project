@@ -26,9 +26,13 @@ def lambda_handler(event, context):
         cpf = body.get("cpf")
         password = body.get("password")
         full_name = body.get("fullName")
+        role = body.get("role", "patient")
         
         if not cpf or not password:
             return response(400, {"message": "CPF e senha são obrigatórios."})
+
+        if role not in ["patient", "doctor"]:
+            return response(400, {"message": "Tipo de perfil inválido."})
 
         table = dynamodb.Table(TABLE_NAME)
         
@@ -42,8 +46,11 @@ def lambda_handler(event, context):
             "cpf": cpf,
             "password": password, 
             "fullName": full_name,
-            "chronicConditions": body.get("chronicConditions", []),
-            "medications": body.get("medications", []),
+            "role": role,
+            "chronicConditions": body.get("chronicConditions", []) if role == "patient" else [],
+            "medications": body.get("medications", []) if role == "patient" else [],
+            "specialty": body.get("specialty", "") if role == "doctor" else "",
+            "crm": body.get("crm", "") if role == "doctor" else "",
             "createdAt": datetime.utcnow().isoformat() + "Z"
         }
         
