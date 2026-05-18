@@ -1,40 +1,61 @@
-# MediFlow — MVP Serverless de Triagem Clínica
+# MediFlow - MVP Serverless de Triagem Clinica
 
-MediFlow é um MVP de triagem clínica digital construído para demonstrar uma arquitetura serverless na AWS. O objetivo do trabalho é simular um fluxo real de entrada de pacientes, calcular uma prioridade clínica de forma transparente, organizar a fila por risco e registrar os eventos para atendimento e análise posterior.
+MediFlow e um MVP academico de triagem clinica digital. O projeto simula um fluxo de entrada de pacientes, calcula uma prioridade de atendimento com regras explicaveis, organiza a fila por risco e permite que um medico acompanhe as triagens em um dashboard.
 
-O projeto combina:
+> Este projeto e educacional. Ele nao substitui avaliacao clinica profissional e nao deve ser usado em producao sem revisao medica, seguranca adequada, autenticacao forte e validacao regulatoria.
 
-- Uma interface web simples para cadastro, login, triagem e acompanhamento da fila.
-- Uma API serverless com AWS SAM, API Gateway, Lambda, Step Functions, DynamoDB, SNS, S3 e KMS.
-- Um motor de scoring white-box, com regras explícitas para sinais vitais, doenças crônicas e sintomas.
-- Persistência e geração assíncrona de relatórios operacionais.
+## Status Atual
 
-> Este projeto é um protótipo educacional. Ele não substitui avaliação clínica profissional nem deve ser usado em produção sem revisão médica, segurança, autenticação adequada e validação regulatória.
+- Backend serverless publicado na AWS com AWS SAM.
+- Frontend vanilla em `frontend/`, rodando localmente e apontando para a API AWS.
+- Cadastro com selecao de perfil: `Paciente` ou `Medico`.
+- Pacientes sao redirecionados para a tela de triagem.
+- Medicos sao redirecionados para o dashboard de triagens.
+- Cadastro de paciente coleta historico de saude e medicamentos.
+- Cadastro de medico coleta especialidade e CRM.
+- Triagens sao processadas por Step Functions Express e persistidas no DynamoDB.
+- Eventos de triagem sao publicados em SNS.
+- Registros de atendimento sao arquivados em S3.
 
-## Objetivo do Trabalho
+API publicada:
 
-O trabalho propõe implementar uma solução de triagem médica com foco em:
+```text
+https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod
+```
 
-1. Receber dados de um paciente autenticado.
-2. Validar sinais vitais informados na triagem.
-3. Combinar sinais vitais, histórico clínico e sintomas reportados.
-4. Calcular uma classificação de urgência explicável.
-5. Inserir o paciente em uma fila priorizada.
-6. Permitir que a equipe visualize pacientes críticos e registre atendimento.
-7. Persistir dados e eventos para rastreabilidade e relatórios.
-8. Aplicar boas práticas de arquitetura serverless, segurança em repouso e minimização de dados.
+Frontend local atual:
 
-## Estado Atual
+```text
+http://127.0.0.1:8002/login.html
+```
 
-O repositório já contém:
+## Objetivo
 
-- Infraestrutura AWS SAM em `template.yaml`.
-- State Machine em `infra/statemachine/triage.asl.json`.
-- Lambdas de autenticação, triagem, fila, atendimento, alerta e relatório.
-- Frontend vanilla em `frontend/`.
-- Testes locais exploratórios em Python.
+O sistema demonstra uma arquitetura serverless para:
 
-Também existem pendências conhecidas, listadas em [Pendências Técnicas](#pendencias-tecnicas).
+1. Cadastrar usuarios com perfil de paciente ou medico.
+2. Autenticar usuarios de forma simplificada para o MVP.
+3. Receber sinais vitais e sintomas de pacientes.
+4. Combinar sinais vitais, historico clinico e sintomas reportados.
+5. Calcular score de risco e nivel de urgencia.
+6. Persistir a triagem em uma fila priorizada.
+7. Permitir ao medico visualizar e atender pacientes.
+8. Arquivar o atendimento e gerar eventos assicronos.
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Frontend | HTML, CSS, JavaScript vanilla |
+| Backend | Python 3.12 em AWS Lambda |
+| Infraestrutura | AWS SAM / CloudFormation |
+| API | Amazon API Gateway REST API |
+| Orquestracao | AWS Step Functions Express |
+| Banco | Amazon DynamoDB |
+| Eventos | Amazon SNS |
+| Arquivos | Amazon S3 |
+| Criptografia | AWS KMS |
+| Logs | Amazon CloudWatch Logs |
 
 ## Estrutura do Projeto
 
@@ -84,149 +105,352 @@ mediflow-project/
     └── test_locally.py
 ```
 
-## Arquitetura AWS
-
-| Recurso | Papel |
-|---|---|
-| API Gateway | Expõe endpoints REST para frontend e dashboard. |
-| Lambda | Executa autenticação, triagem, fila, atendimento, alerta e relatórios. |
-| Step Functions Express | Orquestra o fluxo síncrono de triagem. |
-| DynamoDB | Armazena usuários e triagens. |
-| SNS | Publica evento `triage.completed` após a triagem. |
-| S3 | Guarda relatórios e registros de atendimento. |
-| KMS | Criptografia em repouso para DynamoDB, SNS e S3. |
-
-## Endpoints
-
-| Método | Rota | Função |
-|---|---|---|
-| `POST` | `/auth/register` | Cadastra usuário/paciente. |
-| `POST` | `/auth/login` | Valida login e retorna perfil. |
-| `POST` | `/triage` | Inicia a triagem via Step Functions. |
-| `GET` | `/triage/queue` | Lista pacientes aguardando atendimento. |
-| `POST` | `/triage/{triageId}/attend` | Marca paciente como atendido e arquiva registro no S3. |
-
-## Fluxo de Triagem
+## Arquitetura
 
 ```mermaid
 graph TD
-    A["Frontend: POST /triage"] --> B["Triage Proxy"]
-    B --> C["Step Functions Express"]
-    C --> D["IdentifyPatient"]
-    D --> E["ParallelProcessing"]
-    E --> F["ValidateVitals"]
-    E --> G["FetchHistory"]
-    E --> H["ClassifySymptoms"]
-    F --> I["CalculateScore"]
-    G --> I
-    H --> I
-    I --> J["PersistAndNotify"]
-    J --> K["DynamoDB: status WAITING"]
-    J --> L["SNS: triage.completed"]
-    L --> M["AsyncReports -> S3"]
-    L --> N["CriticalAlert, se CRITICAL"]
-    K --> O["Dashboard: GET /triage/queue"]
-    O --> P["POST /triage/{triageId}/attend"]
-    P --> Q["DynamoDB: status ATTENDED"]
-    P --> R["S3: attended/YYYY/MM/DD"]
+    A["Frontend local ou hospedado"] --> B["API Gateway /Prod"]
+    B --> C1["Lambda Register/Login"]
+    B --> C2["Lambda StartTriage"]
+    B --> C3["Lambda Queue/Attend"]
+
+    C1 --> D1["DynamoDB UsersTable"]
+    C2 --> E["Step Functions Express"]
+    E --> F1["IdentifyPatient"]
+    E --> F2["ValidateVitals"]
+    E --> F3["FetchHistory"]
+    E --> F4["ClassifySymptoms"]
+    E --> F5["CalculateScore"]
+    E --> F6["PersistAndNotify"]
+
+    F1 --> D1
+    F3 --> D1
+    F6 --> D2["DynamoDB TriageTable"]
+    F6 --> G["SNS TriageEventsTopic"]
+    G --> H["AsyncReports Lambda"]
+    G --> I["CriticalAlert Lambda"]
+    H --> J["S3 ReportsBucket"]
+    C3 --> D2
+    C3 --> J
 ```
 
-## Motor de Scoring
+## Fluxo Funcional
 
-O score é white-box: cada ponto adicionado é explicável no retorno da API. A classificação final é calculada a partir de três dimensões.
-
-### 1. Sinais Vitais
-
-| Condição | Pontos |
-|---|---:|
-| FC > 120 bpm | +30 |
-| FC > 100 bpm | +15 |
-| FC < 50 bpm | +25 |
-| SpO2 < 90% | +35 |
-| SpO2 < 94% | +20 |
-| Temperatura >= 39.5°C | +25 |
-| Temperatura >= 38.0°C | +10 |
-| Temperatura < 35.0°C | +20 |
-| PAS < 80 mmHg | +35 |
-| PAS < 90 mmHg | +20 |
-| PAS > 180 mmHg | +25 |
-
-### 2. Doenças Crônicas
-
-| Condição | Pontos |
-|---|---:|
-| Insuficiência cardíaca | +20 |
-| Diabetes tipo 1 | +15 |
-| DPOC | +12 |
-| Diabetes tipo 2 | +10 |
-| Hipertensão | +8 |
-| Asma | +7 |
-| Obesidade | +5 |
-
-### 3. Sintomas
-
-Sintomas críticos, como dor no peito, dificuldade respiratória, perda de consciência, convulsão e paralisia súbita, recebem maior peso. Quando há dois ou mais sintomas críticos simultâneos, o motor aplica bônus de correlação.
-
-Classificação final:
-
-| Score | Urgência |
-|---:|---|
-| `< 25` | `LOW` |
-| `25 - 49` | `MEDIUM` |
-| `50 - 79` | `HIGH` |
-| `>= 80` | `CRITICAL` |
+1. Usuario acessa `login.html`.
+2. No cadastro, escolhe `Paciente` ou `Medico`.
+3. Se for paciente, preenche historico de saude e medicamentos.
+4. Se for medico, preenche especialidade e CRM.
+5. Login/cadastro salva o perfil no `localStorage` do navegador.
+6. Paciente e direcionado para `index.html`.
+7. Medico e direcionado para `dashboard.html`.
+8. Paciente envia sinais vitais e sintomas para `POST /triage`.
+9. API Gateway chama `StartTriageFunction`.
+10. Step Functions executa identificacao, validacao, historico, sintomas, score e persistencia.
+11. Resultado volta para o paciente com score, urgencia e explicacao.
+12. Dashboard medico consulta `GET /triage/queue` a cada 2 segundos.
+13. Medico registra atendimento em `POST /triage/{triageId}/attend`.
+14. Atendimento sai da fila ativa e um JSON e salvo no S3.
 
 ## Frontend
 
-O frontend está em `frontend/` e possui três telas principais:
+O frontend esta em `frontend/` e possui tres telas:
 
-- `login.html`: cadastro e login.
-- `index.html`: formulário de triagem do paciente.
-- `dashboard.html`: fila de pacientes aguardando atendimento.
+| Tela | Arquivo | Descricao |
+|---|---|---|
+| Login/Cadastro | `frontend/login.html` | Cadastro, login e selecao de perfil |
+| Triagem | `frontend/index.html` | Formulario do paciente com sinais vitais e sintomas |
+| Dashboard | `frontend/dashboard.html` | Fila medica com alertas e botao de atendimento |
 
-No modo local, o perfil do usuário é definido pelo CPF:
+Configuracao principal:
 
-- CPFs presentes na lista local de médicos entram como `doctor` e são redirecionados para `dashboard.html`.
-- Demais CPFs entram como `patient` e são redirecionados para `index.html`.
+```js
+const CONFIG = {
+    LOCAL_MODE: false,
+    API_URL: 'https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod'
+};
+```
 
-Usuários locais de demonstração:
+Para rodar localmente:
+
+```bash
+cd frontend
+python3 -m http.server 8002
+```
+
+Acesse:
+
+```text
+http://127.0.0.1:8002/login.html
+```
+
+### Modo Local
+
+O arquivo `frontend/assets/js/config.js` ainda possui suporte a `LOCAL_MODE: true`, que usa `localStorage` para cadastro, login, fila e triagens sem chamar AWS. No estado atual do projeto, `LOCAL_MODE` esta `false`, usando a API publicada.
+
+Usuarios locais sem AWS, quando `LOCAL_MODE: true`:
 
 | Perfil | CPF | Senha | Destino |
 |---|---|---|---|
-| Paciente | `11111111111` | `123456` | Triagem |
-| Médico | `22222222222` | `123456` | Dashboard |
+| Paciente | `11111111111` | `123456` | `index.html` |
+| Medico | `22222222222` | `123456` | `dashboard.html` |
 
-Após executar uma triagem local, o paciente visualiza a posição na fila, número de pessoas à frente e tempo estimado de espera.
+## Backend AWS
 
-O arquivo `frontend/assets/js/config.js` define a URL base da API:
+Stack publicada:
 
-```js
-API_URL: 'https://c79cspmegc.execute-api.us-east-1.amazonaws.com/Prod'
+```text
+mediflow-v2026
 ```
 
-Para testar localmente a interface, abra os arquivos HTML diretamente no navegador. Para usar a API real, o endpoint configurado precisa apontar para o output `BaseApiEndpoint` do deploy SAM.
+Regiao:
 
-## Deploy
-
-Pré-requisitos:
-
-- AWS CLI configurado.
-- AWS SAM CLI instalado.
-- Credenciais AWS com permissão para criar os recursos definidos no template.
-
-Comandos:
-
-```bash
-sam build
-sam deploy --guided
+```text
+us-east-1
 ```
 
-Após o deploy, copie o output `BaseApiEndpoint` para `frontend/assets/js/config.js`.
+Outputs do deploy:
 
-Exemplo de chamada:
+| Output | Valor |
+|---|---|
+| `BaseApiEndpoint` | `https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod` |
+| `TriageApiEndpoint` | `https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/triage` |
+| `TriageTableName` | `mediflow-v2026-TriageTable-15ERFN48VAMQR` |
+| `ReportsBucketName` | `mediflow-v2026-reportsbucket-xckvwemey7tz` |
+| `TriageEventsTopicArn` | `arn:aws:sns:us-east-1:722851019641:mediflow-v2026-TriageEventsTopic-XKcrS81pA2m4` |
+| `TriageStateMachineArn` | `arn:aws:states:us-east-1:722851019641:stateMachine:TriageStateMachine-zWYspBdFNf1I` |
+
+## Documentacao da API
+
+Base URL:
+
+```text
+https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod
+```
+
+Headers comuns:
+
+```http
+Content-Type: application/json
+```
+
+Autenticacao: nao ha autenticacao real neste MVP. As rotas estao abertas para simplificar a demonstracao academica.
+
+### POST /auth/register
+
+Cadastra um usuario.
+
+URL:
+
+```text
+POST /auth/register
+```
+
+#### Cadastro de Paciente
+
+Request:
+
+```json
+{
+  "fullName": "Joao Paciente",
+  "cpf": "11111111111",
+  "password": "123456",
+  "role": "patient",
+  "chronicConditions": ["diabetes", "hipertensao"],
+  "medications": ["Metformina", "Losartana"],
+  "specialty": "",
+  "crm": ""
+}
+```
+
+Response `201`:
+
+```json
+{
+  "message": "Cadastro realizado com sucesso!"
+}
+```
+
+#### Cadastro de Medico
+
+Request:
+
+```json
+{
+  "fullName": "Dra. Ana Medica",
+  "cpf": "22222222222",
+  "password": "123456",
+  "role": "doctor",
+  "chronicConditions": [],
+  "medications": [],
+  "specialty": "Clinica medica",
+  "crm": "CRM-SP 123456"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "message": "Cadastro realizado com sucesso!"
+}
+```
+
+Erros comuns:
+
+| Status | Quando |
+|---:|---|
+| `400` | Corpo vazio, CPF/senha ausentes, perfil invalido ou CPF ja cadastrado |
+| `500` | Erro interno ao acessar DynamoDB |
+
+Exemplo curl:
 
 ```bash
-curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/Prod/triage \
+curl -X POST https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fullName": "Joao Paciente",
+    "cpf": "11111111111",
+    "password": "123456",
+    "role": "patient",
+    "chronicConditions": ["diabetes", "hipertensao"],
+    "medications": ["Metformina"],
+    "specialty": "",
+    "crm": ""
+  }'
+```
+
+### POST /auth/login
+
+Valida CPF e senha e retorna o perfil.
+
+URL:
+
+```text
+POST /auth/login
+```
+
+Request:
+
+```json
+{
+  "cpf": "11111111111",
+  "password": "123456"
+}
+```
+
+Response `200` para paciente:
+
+```json
+{
+  "cpf": "11111111111",
+  "fullName": "Joao Paciente",
+  "role": "patient",
+  "chronicConditions": ["diabetes", "hipertensao"],
+  "medications": ["Metformina", "Losartana"],
+  "specialty": "",
+  "crm": ""
+}
+```
+
+Response `200` para medico:
+
+```json
+{
+  "cpf": "22222222222",
+  "fullName": "Dra. Ana Medica",
+  "role": "doctor",
+  "chronicConditions": [],
+  "medications": [],
+  "specialty": "Clinica medica",
+  "crm": "CRM-SP 123456"
+}
+```
+
+Erros comuns:
+
+| Status | Quando |
+|---:|---|
+| `400` | Corpo vazio ou CPF/senha ausentes |
+| `401` | Usuario nao encontrado ou senha incorreta |
+| `500` | Erro interno |
+
+Exemplo curl:
+
+```bash
+curl -X POST https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"cpf":"11111111111","password":"123456"}'
+```
+
+### POST /triage
+
+Inicia uma triagem. A Lambda `StartTriageFunction` chama a Step Function `TriageStateMachine` de forma sincrona.
+
+URL:
+
+```text
+POST /triage
+```
+
+Request:
+
+```json
+{
+  "patientId": "11111111111",
+  "heartRate": 130,
+  "spo2": 88,
+  "temperature": 39.8,
+  "systolicBP": 75,
+  "symptoms": ["dor_no_peito", "dificuldade_respiratoria", "tontura"],
+  "chronicConditions": ["diabetes"],
+  "medications": ["Metformina"],
+  "fullName": "Joao Paciente"
+}
+```
+
+Campos:
+
+| Campo | Tipo | Obrigatorio | Descricao |
+|---|---|---|---|
+| `patientId` | string | Sim | CPF do paciente |
+| `heartRate` | number | Sim | Frequencia cardiaca em bpm |
+| `spo2` | number | Sim | Saturacao de oxigenio em porcentagem |
+| `temperature` | number | Sim | Temperatura em Celsius |
+| `systolicBP` | number | Sim | Pressao arterial sistolica em mmHg |
+| `symptoms` | string[] | Sim | Lista de sintomas por chave |
+| `chronicConditions` | string[] | Nao | Historico enviado pelo frontend; no fluxo AWS o historico tambem e buscado no DynamoDB |
+| `medications` | string[] | Nao | Medicamentos informados no cadastro |
+| `fullName` | string | Nao | Nome do paciente |
+
+Response `200`:
+
+```json
+{
+  "triageId": "T-1779100000",
+  "riskScore": 220,
+  "urgencyLevel": "CRITICAL",
+  "explanation": [
+    "[VITAL] Taquicardia severa (FC=130.0 bpm)",
+    "[VITAL] Hipoxemia critica (SpO2=88.0%)",
+    "[VITAL] Febre alta (T=39.8°C)",
+    "[VITAL] Hipotensao severa (PAS=75.0 mmHg)",
+    "[SINTOMA:CRITICAL] Dor no peito (+35 pts)",
+    "[SINTOMA:CRITICAL] Dificuldade respiratoria / Dispneia (+35 pts)",
+    "[CORRELACAO] 2 sintomas criticos simultaneos (+15 pts)"
+  ]
+}
+```
+
+Erros comuns:
+
+| Status | Quando |
+|---:|---|
+| `500` | Falha na execucao da Step Function ou erro interno |
+
+Exemplo curl:
+
+```bash
+curl -X POST https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/triage \
   -H "Content-Type: application/json" \
   -d '{
     "patientId": "11111111111",
@@ -234,30 +458,226 @@ curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/Prod/triage \
     "spo2": 88,
     "temperature": 39.8,
     "systolicBP": 75,
-    "symptoms": ["dor_no_peito", "dificuldade_respiratoria", "tontura"]
+    "symptoms": ["dor_no_peito", "dificuldade_respiratoria", "tontura"],
+    "fullName": "Joao Paciente"
   }'
 ```
 
-## Segurança e Privacidade
+### GET /triage/queue
 
-O template já inclui:
+Lista triagens com status `WAITING`, ordenadas por maior `riskScore`.
 
-- Criptografia em repouso com KMS para DynamoDB, SNS e S3.
-- TTL no DynamoDB para expurgo automático de triagens após 90 dias.
-- Políticas IAM declarativas por função.
-- Separação entre fluxo síncrono de triagem e processamento assíncrono de relatórios.
+URL:
 
-Pontos que ainda precisam ser tratados antes de produção:
+```text
+GET /triage/queue
+```
 
-- Senhas devem ser armazenadas com hash seguro, nunca em texto puro.
-- Autenticação deve usar tokens/sessões reais, não apenas `localStorage`.
-- Logs devem evitar CPF, nome, sintomas livres e qualquer outro dado sensível.
-- Erros internos não devem retornar detalhes técnicos ao frontend.
-- Regras clínicas devem ser revisadas por profissional habilitado.
+Response `200`:
 
-## Testes Locais
+```json
+[
+  {
+    "triageId": "T-1779100000",
+    "patientId": "11111111111",
+    "fullName": "Joao Paciente",
+    "riskScore": 220,
+    "urgencyLevel": "CRITICAL",
+    "scoreBreakdown": {
+      "vitalsScore": 125,
+      "historyScore": 0,
+      "symptomsScore": 95
+    },
+    "explanation": ["..."],
+    "vitals": {
+      "vitalsValid": true,
+      "vitals": {
+        "heartRate": { "value": 130, "unit": "bpm", "status": "NORMAL" }
+      }
+    },
+    "chronicConditions": ["diabetes"],
+    "reportedSymptoms": [],
+    "createdAt": "2026-05-18T11:00:00Z",
+    "eventTimestamp": "2026-05-18T11:00:00Z",
+    "expiresAt": 1787000000,
+    "status": "WAITING"
+  }
+]
+```
 
-Existem três scripts de teste:
+Erros comuns:
+
+| Status | Quando |
+|---:|---|
+| `500` | Erro ao consultar DynamoDB |
+
+Exemplo curl:
+
+```bash
+curl https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/triage/queue
+```
+
+### POST /triage/{triageId}/attend
+
+Marca uma triagem como atendida e arquiva um registro JSON no S3.
+
+URL:
+
+```text
+POST /triage/{triageId}/attend
+```
+
+Path parameter:
+
+| Campo | Tipo | Descricao |
+|---|---|---|
+| `triageId` | string | ID da triagem retornado por `POST /triage` |
+
+Response `200`:
+
+```json
+{
+  "message": "Atendimento registrado com sucesso!",
+  "s3Key": "attended/2026/05/18/T-1779100000.json"
+}
+```
+
+Erros comuns:
+
+| Status | Quando |
+|---:|---|
+| `400` | `triageId` ausente |
+| `404` | Triagem nao encontrada |
+| `500` | Erro ao atualizar DynamoDB ou salvar no S3 |
+
+Exemplo curl:
+
+```bash
+curl -X POST https://bn51l4hc7g.execute-api.us-east-1.amazonaws.com/Prod/triage/T-1779100000/attend
+```
+
+## Sintomas Aceitos
+
+O catalogo de sintomas fica em `src/functions/workflow/symptoms/app.py`.
+
+| Chave | Severidade | Peso |
+|---|---|---:|
+| `dor_no_peito` | `CRITICAL` | 35 |
+| `dificuldade_respiratoria` | `CRITICAL` | 35 |
+| `perda_consciencia` | `CRITICAL` | 40 |
+| `convulsao` | `CRITICAL` | 40 |
+| `paralisia_subita` | `CRITICAL` | 40 |
+| `confusao_mental` | `CRITICAL` | 30 |
+| `dor_abdominal_intensa` | `HIGH` | 25 |
+| `sangramento_ativo` | `HIGH` | 25 |
+| `vomito_persistente` | `HIGH` | 15 |
+| `febre_persistente` | `HIGH` | 15 |
+| `dor_de_cabeca_intensa` | `HIGH` | 20 |
+| `dor_toracica_ao_respirar` | `HIGH` | 20 |
+| `edema_membros` | `HIGH` | 15 |
+| `tontura` | `MEDIUM` | 10 |
+| `nausea` | `MEDIUM` | 8 |
+| `diarreia` | `MEDIUM` | 8 |
+| `dor_de_cabeca_leve` | `MEDIUM` | 5 |
+| `dor_muscular` | `MEDIUM` | 5 |
+| `tosse_persistente` | `MEDIUM` | 8 |
+| `palpitacoes` | `MEDIUM` | 12 |
+| `dor_de_garganta` | `LOW` | 3 |
+| `coriza` | `LOW` | 2 |
+| `fadiga` | `LOW` | 3 |
+| `coceira` | `LOW` | 2 |
+| `dor_nas_costas` | `LOW` | 4 |
+
+Sintomas desconhecidos recebem severidade `MEDIUM` e peso `5`.
+
+## Motor de Scoring
+
+O score e white-box: cada ponto adicionado gera uma justificativa em `explanation`.
+
+### Sinais Vitais
+
+| Condicao | Pontos |
+|---|---:|
+| FC > 120 bpm | +30 |
+| FC > 100 bpm | +15 |
+| FC < 50 bpm | +25 |
+| SpO2 < 90% | +35 |
+| SpO2 < 94% | +20 |
+| Temperatura >= 39.5 C | +25 |
+| Temperatura >= 38.0 C | +10 |
+| Temperatura < 35.0 C | +20 |
+| PAS < 80 mmHg | +35 |
+| PAS < 90 mmHg | +20 |
+| PAS > 180 mmHg | +25 |
+
+### Doencas Cronicas
+
+| Condicao | Pontos |
+|---|---:|
+| `insuficiencia_cardiaca` | +20 |
+| `diabetes_tipo_1` | +15 |
+| `diabetes_tipo_2` | +10 |
+| `hipertensao` | +8 |
+| `asma` | +7 |
+| `obesidade` | +5 |
+| `dpoc` | +12 |
+| Condicao nao mapeada | +5 |
+
+### Classificacao Final
+
+| Score | Urgencia |
+|---:|---|
+| `< 25` | `LOW` |
+| `25 - 49` | `MEDIUM` |
+| `50 - 79` | `HIGH` |
+| `>= 80` | `CRITICAL` |
+
+Se houver dois ou mais sintomas criticos, o motor adiciona bonus de correlacao:
+
+```text
+15 * (quantidade_de_sintomas_criticos - 1)
+```
+
+## Deploy
+
+Pre-requisitos:
+
+- AWS CLI configurado.
+- AWS SAM CLI instalado.
+- Credenciais AWS com permissao para CloudFormation, Lambda, API Gateway, DynamoDB, SNS, S3, KMS, IAM e Step Functions.
+
+Build:
+
+```bash
+sam build
+```
+
+Deploy guiado:
+
+```bash
+sam deploy --guided
+```
+
+Configuracao atual em `samconfig.toml`:
+
+```toml
+stack_name = "mediflow-v2026"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = true
+disable_rollback = true
+```
+
+Depois do deploy, copie `BaseApiEndpoint` para `frontend/assets/js/config.js` e deixe:
+
+```js
+LOCAL_MODE: false
+```
+
+## Testes
+
+Testes locais disponiveis:
 
 ```bash
 python3 tests/test_auth.py
@@ -265,28 +685,89 @@ python3 tests/test_locally.py
 python3 -m unittest tests/test_final_flow.py
 ```
 
-Os testes instalam um stub local de `boto3` quando o pacote não existe no ambiente, permitindo validar a lógica principal sem credenciais AWS.
+Validacoes usadas durante o desenvolvimento:
 
-## Pendências Técnicas
+```bash
+node --check frontend/assets/js/auth.js
+node --check frontend/assets/js/config.js
+python3 -B -c "compile(open('src/functions/api/auth/user/register/app.py').read(), 'register', 'exec')"
+sam build
+```
 
-Pendências identificadas no estado atual do código:
+## Seguranca e Privacidade
 
-- Corrigir `frontend/assets/js/auth.js`: o cadastro monta `payload`, mas envia uma variável inexistente chamada `conditions`.
-- Alinhar a origem do histórico clínico: `PatientsTable` usa chave `patientId`, enquanto partes do fluxo usam `cpf`.
-- Definir se usuários e pacientes devem viver na mesma tabela ou em tabelas separadas.
-- Remover `__pycache__/` do controle de versão antes do primeiro commit.
-- Criar `requirements.txt` ou instruções de ambiente para testes locais.
-- Atualizar testes para mockar `boto3` sem depender da instalação real.
-- Revisar CORS, autenticação, autorização e exposição de erros.
+Para o escopo academico do MVP, algumas simplificacoes foram mantidas de proposito:
 
-## Status do Repositório
+- Senhas sao armazenadas em texto puro.
+- API Gateway nao exige autenticacao.
+- O frontend usa `localStorage` para manter o perfil logado.
+- Rotas medicas dependem do `role` retornado pelo login/cadastro.
+- CORS permite origem ampla.
 
-Este repositório ainda não possui commits registrados na branch `main`. Todos os arquivos atuais aparecem como não rastreados no Git.
+Medidas ja presentes:
 
-Antes de versionar, recomenda-se:
+- Criptografia em repouso com KMS em DynamoDB, SNS e S3.
+- Politicas IAM por funcao no template SAM.
+- TTL em `TriageTable` via atributo `expiresAt`.
+- Separacao entre fluxo sincrono de triagem e processamento assincrono de eventos.
 
-1. Corrigir as pendências críticas de execução.
-2. Adicionar `.gitignore`.
-3. Remover caches Python.
-4. Rodar testes locais.
-5. Fazer o primeiro commit com a base funcional do MVP.
+Para uma versao de producao, seria necessario:
+
+- Usar Amazon Cognito ou JWT assinado.
+- Aplicar hash de senha com algoritmo apropriado.
+- Proteger rotas de medico no backend.
+- Restringir CORS ao dominio real do frontend.
+- Reduzir dados sensiveis em logs.
+- Revisar regras clinicas com profissional habilitado.
+
+## Limitacoes Conhecidas do MVP
+
+- O identificador do paciente e o CPF (`patientId` no fluxo de triagem).
+- `PatientsTable` existe no template, mas o modelo funcional do MVP usa o CPF em `UsersTable` como origem dos dados do paciente.
+- A fila e ordenada por `riskScore` no backend, nao por uma combinacao completa de peso clinico e tempo.
+- A tela de paciente mostra estimativa de espera apenas no modo local.
+- O botao de limpar fila no dashboard limpa apenas armazenamento local quando a API AWS esta ativa; ele nao apaga triagens no DynamoDB.
+- O ID de triagem usa timestamp em segundos (`T-<timestamp>`), suficiente para demo, mas pode colidir sob alta concorrencia.
+
+## Comandos Uteis
+
+Subir frontend local:
+
+```bash
+cd frontend
+python3 -m http.server 8002
+```
+
+Validar template SAM:
+
+```bash
+sam validate
+```
+
+Build SAM:
+
+```bash
+sam build
+```
+
+Deploy SAM:
+
+```bash
+sam deploy
+```
+
+Ver outputs da stack:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name mediflow-v2026 \
+  --region us-east-1 \
+  --query "Stacks[0].Outputs"
+```
+
+## Proximos Passos Recomendados
+
+1. Hospedar o frontend em Amplify Hosting ou S3 + CloudFront.
+2. Atualizar o README com a URL publica do frontend hospedado.
+3. Criar um roteiro de demonstracao para banca: cadastro paciente, triagem critica, dashboard medico, atendimento.
+4. Se o projeto evoluir alem do MVP, substituir autenticacao simplificada por Cognito.
