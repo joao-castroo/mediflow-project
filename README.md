@@ -134,6 +134,22 @@ graph TD
     C3 --> J
 ```
 
+### Arquitetura Cloud (Serverless) - Trion
+
+![Diagrama da Arquitetura Macro](diagrama/diagrama1.png)
+
+Este diagrama detalha a infraestrutura baseada em nuvem para o sistema de pré-avaliação clínica. O projeto utiliza uma abordagem 100% *serverless* na AWS para garantir alta disponibilidade, escalabilidade e otimização de custos durante o processamento de dados de saúde.
+
+---
+
+### Fluxo de Orquestração da Triagem (AWS Step Functions)
+
+![Diagrama do Fluxo de Step Functions](diagrama/diagrama2.jpeg)
+
+Este diagrama ilustra o fluxo de execução (State Machine) que compõe o *core* do processo de triagem médica. O fluxo foi desenhado para ser rápido e eficiente, executando validações clínicas de forma simultânea.
+
+---
+
 ## Fluxo Funcional
 
 1. Usuario acessa `login.html`.
