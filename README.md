@@ -134,7 +134,7 @@ graph TD
     C3 --> J
 ```
 
-### Arquitetura Cloud (Serverless) - Trion
+### Arquitetura Cloud (Serverless) 
 
 ![Diagrama da Arquitetura Macro](diagrama/diagrama1.png)
 
