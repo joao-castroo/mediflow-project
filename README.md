@@ -42,6 +42,12 @@ O sistema demonstra uma arquitetura serverless para:
 7. Permitir ao medico visualizar e atender pacientes.
 8. Arquivar o atendimento e gerar eventos assicronos.
 
+## 🎥 Demonstração em Vídeo
+
+Clique na imagem abaixo para assistir ao vídeo demonstrando as funcionalidades e o produto em uso:
+
+[![Demonstração do Produto](https://img.youtube.com/vi/rjU4MntdSUM/maxresdefault.jpg)](https://www.youtube.com/watch?v=rjU4MntdSUM)
+
 ## Stack
 
 | Camada | Tecnologia |
