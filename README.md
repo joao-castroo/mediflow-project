@@ -1,6 +1,6 @@
-# MediFlow - MVP Serverless de Triagem Clinica
+# MediFlow - POC Serverless de Triagem Clinica
 
-MediFlow e um MVP academico de triagem clinica digital. O projeto simula um fluxo de entrada de pacientes, calcula uma prioridade de atendimento com regras explicaveis, organiza a fila por risco e permite que um medico acompanhe as triagens em um dashboard.
+MediFlow e uma POC academica de triagem clinica digital. O projeto simula um fluxo de entrada de pacientes, calcula uma prioridade de atendimento com regras explicaveis, organiza a fila por risco e permite que um medico acompanhe as triagens em um dashboard.
 
 > Este projeto e educacional. Ele nao substitui avaliacao clinica profissional e nao deve ser usado em producao sem revisao medica, seguranca adequada, autenticacao forte e validacao regulatoria.
 
@@ -34,7 +34,7 @@ http://127.0.0.1:8002/login.html
 O sistema demonstra uma arquitetura serverless para:
 
 1. Cadastrar usuarios com perfil de paciente ou medico.
-2. Autenticar usuarios de forma simplificada para o MVP.
+2. Autenticar usuarios de forma simplificada para a POC.
 3. Receber sinais vitais e sintomas de pacientes.
 4. Combinar sinais vitais, historico clinico e sintomas reportados.
 5. Calcular score de risco e nivel de urgencia.
@@ -255,7 +255,7 @@ Headers comuns:
 Content-Type: application/json
 ```
 
-Autenticacao: nao ha autenticacao real neste MVP. As rotas estao abertas para simplificar a demonstracao academica.
+Autenticacao: nao ha autenticacao real nesta POC. As rotas estao abertas para simplificar a demonstracao academica.
 
 ### POST /auth/register
 
@@ -718,7 +718,7 @@ sam build
 
 ## Seguranca e Privacidade
 
-Para o escopo academico do MVP, algumas simplificacoes foram mantidas de proposito:
+Para o escopo academico da POC, algumas simplificacoes foram mantidas de proposito:
 
 - Senhas sao armazenadas em texto puro.
 - API Gateway nao exige autenticacao.
@@ -742,10 +742,10 @@ Para uma versao de producao, seria necessario:
 - Reduzir dados sensiveis em logs.
 - Revisar regras clinicas com profissional habilitado.
 
-## Limitacoes Conhecidas do MVP
+## Limitacoes Conhecidas da POC
 
 - O identificador do paciente e o CPF (`patientId` no fluxo de triagem).
-- `PatientsTable` existe no template, mas o modelo funcional do MVP usa o CPF em `UsersTable` como origem dos dados do paciente.
+- `PatientsTable` existe no template, mas o modelo funcional da POC usa o CPF em `UsersTable` como origem dos dados do paciente.
 - A fila e ordenada por `riskScore` no backend, nao por uma combinacao completa de peso clinico e tempo.
 - A tela de paciente mostra estimativa de espera apenas no modo local.
 - O botao de limpar fila no dashboard limpa apenas armazenamento local quando a API AWS esta ativa; ele nao apaga triagens no DynamoDB.
@@ -792,4 +792,4 @@ aws cloudformation describe-stacks \
 1. Hospedar o frontend em Amplify Hosting ou S3 + CloudFront.
 2. Atualizar o README com a URL publica do frontend hospedado.
 3. Criar um roteiro de demonstracao para banca: cadastro paciente, triagem critica, dashboard medico, atendimento.
-4. Se o projeto evoluir alem do MVP, substituir autenticacao simplificada por Cognito.
+4. Se o projeto evoluir alem da POC, substituir autenticacao simplificada por Cognito.
